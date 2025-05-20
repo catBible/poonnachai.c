@@ -1,6 +1,6 @@
-# Firebase Studio
+# Firebase Studio Project
 
-This is a NextJS starter in Firebase Studio.
+NextJS starter in Firebase Studio.
 
 To get started, take a look at src/app/page.tsx.
 # poonnachai.c
