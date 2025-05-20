@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
-import { Loader2, Mail, KeyRound, LogIn } from 'lucide-react';
+import { Loader2, Mail, KeyRound, LogIn, UserCog } from 'lucide-react';
 
 const signInSchema = z.object({
   email: z.string().email({ message: "Invalid email address" }),
@@ -63,6 +63,32 @@ export function SignInForm() {
     }
   };
 
+  const handleAdminLogin = async () => {
+    setLoading(true);
+    const adminEmail = 'admin@example.com';
+    const adminPassword = 'p123456';
+    
+    toast({
+      title: "Dev Admin Login",
+      description: `Attempting to sign in as ${adminEmail}. Ensure this user exists in your Firebase project with the password '${adminPassword}'.`,
+      duration: 7000, // Keep toast longer for this important dev message
+    });
+
+    try {
+      await signInWithEmailAndPassword(auth, adminEmail, adminPassword);
+      toast({ title: "Signed in as Admin successfully!" });
+    } catch (error: any) {
+      toast({
+        title: "Admin Sign-in failed",
+        description: `${error.message || "Could not sign in as admin."} Please ensure the user ${adminEmail} with password '${adminPassword}' is created in Firebase Authentication.`,
+        variant: "destructive",
+        duration: 9000,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <div className="space-y-2">
@@ -82,7 +108,7 @@ export function SignInForm() {
         {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
       </div>
       <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" disabled={loading || googleLoading}>
-        {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogIn className="mr-2 h-4 w-4" /> }
+        {loading && !googleLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogIn className="mr-2 h-4 w-4" /> }
         Sign In
       </Button>
       <div className="relative my-4">
@@ -95,6 +121,16 @@ export function SignInForm() {
           </span>
         </div>
       </div>
+      <Button
+        type="button"
+        variant="outline"
+        className="w-full border-border hover:bg-accent hover:text-accent-foreground"
+        onClick={handleAdminLogin}
+        disabled={loading || googleLoading}
+      >
+        {loading && !googleLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserCog className="mr-2 h-4 w-4" />}
+        Login as Admin (dev)
+      </Button>
       <Button
         type="button"
         variant="outline"
