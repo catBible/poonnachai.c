@@ -14,7 +14,7 @@ const firebaseConfigValues = {
 
 // Helper function to convert camelCase to SNAKE_CASE_UPPER
 const camelToSnakeCaseUpper = (str: string) => {
-  return str.replace(/([a-z])([A-Z])/g, '$1_$2').toUpperCase();
+  return str.replace(/([A-Z])/g, '_$1').toUpperCase();
 }
 
 // Check for missing Firebase configuration keys
@@ -22,7 +22,7 @@ const requiredKeys: (keyof typeof firebaseConfigValues)[] = [
   'apiKey',
   'authDomain',
   'projectId',
-]; // Add other keys if they are strictly essential for your app's startup
+];
 
 const missingKeys = requiredKeys.filter(key => !firebaseConfigValues[key]);
 
@@ -44,7 +44,6 @@ You can find these values in your Firebase project settings:
 Project Overview -> Project settings (gear icon) -> General -> Your apps -> Firebase SDK snippet -> Config.
 `;
   console.error(errorMessage);
-  // Throwing an error here will stop the app execution and display this message prominently.
   throw new Error(errorMessage);
 }
 
@@ -54,36 +53,23 @@ let app: FirebaseApp;
 let auth: Auth;
 let db: Firestore;
 
-// Initialize Firebase only on the client-side and if no app has been initialized yet
-if (typeof window !== 'undefined' && !getApps().length) {
+if (!getApps().length) {
+  // If no Firebase app has been initialized yet, initialize one.
+  // This will run once, either on the server (first import) or on the client (first import).
   try {
     app = initializeApp(firebaseConfig);
     auth = getAuth(app);
     db = getFirestore(app);
-  } catch (error) {
+  } catch (error: any) {
     console.error("Failed to initialize Firebase:", error);
-    // Propagate the error so Next.js can display its error overlay
-    throw error;
+    // It's critical to re-throw the error, especially if it happens during server build/render
+    throw new Error(`Firebase initialization failed: ${error.message || String(error)}`);
   }
-} else if (getApps().length > 0) {
-  // If an app is already initialized, use it
+} else {
+  // If an app is already initialized, use it.
   app = getApps()[0];
   auth = getAuth(app);
   db = getFirestore(app);
-} else {
-  // This case (server-side without an app) should be handled if you need server-side Firebase Admin SDK.
-  // For client-side only apps, this branch might not be typically hit if window check is correct.
-  // To prevent 'app is not defined' errors, we can assign them conditionally or ensure they are always assigned.
-  // However, if this branch is reached and `app` is needed, it will cause issues.
-  // For now, the primary concern is client-side initialization.
-  console.warn(
-    "Firebase is not initialized. This may occur during server-side rendering or if the client-side initialization conditions are not met."
-  );
-  // Assigning dummy or throwing an error here depends on whether server-side operations are expected.
-  // To avoid 'not defined' errors if these are exported and used without proper init:
-  // app = null as any; auth = null as any; db = null as any;
-  // Or better, ensure consumers check for successful initialization.
 }
 
-// @ts-ignore
 export { app, auth, db };
