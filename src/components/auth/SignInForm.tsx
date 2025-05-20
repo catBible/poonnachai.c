@@ -14,12 +14,16 @@ import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { Loader2, Mail, KeyRound, LogIn, UserCog } from 'lucide-react';
 
+// Schema now only requires a non-empty string for usernameOrEmail.
+// Specific email format validation will happen in the onSubmit handler.
 const signInSchema = z.object({
-  email: z.string().email({ message: "Invalid email address" }),
+  usernameOrEmail: z.string().min(1, { message: "Username or Email is required" }),
   password: z.string().min(6, { message: "Password must be at least 6 characters" }),
 });
 
 type SignInFormValues = z.infer<typeof signInSchema>;
+
+const DEFAULT_EMAIL_DOMAIN = "example.com"; // Consistent with SignUpForm
 
 export function SignInForm() {
   const [loading, setLoading] = useState(false);
@@ -31,14 +35,36 @@ export function SignInForm() {
 
   const onSubmit: SubmitHandler<SignInFormValues> = async (data) => {
     setLoading(true);
+    let emailToLogin = data.usernameOrEmail;
+
+    if (!emailToLogin.includes('@')) {
+      emailToLogin = `${emailToLogin}@${DEFAULT_EMAIL_DOMAIN}`;
+    }
+
+    // Validate if the constructed string is a valid email
+    const emailValidation = z.string().email().safeParse(emailToLogin);
+    if (!emailValidation.success) {
+      toast({
+        title: "Invalid Email Format",
+        description: `"${emailToLogin}" is not a valid email address.`,
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
+    }
+
     try {
-      await signInWithEmailAndPassword(auth, data.email, data.password);
+      await signInWithEmailAndPassword(auth, emailToLogin, data.password);
       toast({ title: "Signed in successfully!" });
       // Redirect is handled by AuthLayout/HomePage
     } catch (error: any) {
+      let errorMessage = error.message || "An unknown error occurred.";
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+          errorMessage = "Invalid username/email or password. Please try again."
+      }
       toast({
         title: "Sign-in failed",
-        description: error.message || "An unknown error occurred.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -65,13 +91,14 @@ export function SignInForm() {
 
   const handleAdminLogin = async () => {
     setLoading(true);
-    const adminEmail = 'admin@example.com';
+    const adminUsername = 'admin'; // Use username here
+    const adminEmail = `${adminUsername}@${DEFAULT_EMAIL_DOMAIN}`;
     const adminPassword = 'p123456';
     
     toast({
       title: "Dev Admin Login",
       description: `Attempting to sign in as ${adminEmail}. Ensure this user exists in your Firebase project with the password '${adminPassword}'.`,
-      duration: 7000, // Keep toast longer for this important dev message
+      duration: 7000,
     });
 
     try {
@@ -92,12 +119,18 @@ export function SignInForm() {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <div className="space-y-2">
-        <Label htmlFor="email">Email</Label>
+        <Label htmlFor="usernameOrEmail">Username or Email</Label>
         <div className="relative">
           <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-          <Input id="email" type="email" placeholder="your@email.com" {...register("email")} className="pl-10" />
+          <Input 
+            id="usernameOrEmail" 
+            type="text" 
+            placeholder="your_username or your@email.com" 
+            {...register("usernameOrEmail")} 
+            className="pl-10" 
+          />
         </div>
-        {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
+        {errors.usernameOrEmail && <p className="text-sm text-destructive">{errors.usernameOrEmail.message}</p>}
       </div>
       <div className="space-y-2">
         <Label htmlFor="password">Password</Label>
@@ -128,7 +161,7 @@ export function SignInForm() {
         onClick={handleAdminLogin}
         disabled={loading || googleLoading}
       >
-        {loading && !googleLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserCog className="mr-2 h-4 w-4" />}
+        {loading && !googleLoading && !googleLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserCog className="mr-2 h-4 w-4" />}
         Login as Admin (dev)
       </Button>
       <Button
@@ -151,3 +184,5 @@ export function SignInForm() {
     </form>
   );
 }
+
+    

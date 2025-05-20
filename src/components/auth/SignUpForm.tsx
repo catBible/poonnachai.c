@@ -5,17 +5,17 @@ import { useState } from 'react';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, updateProfile } from 'firebase/auth';
 import { auth } from '@/lib/firebase/config';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
-import { Loader2, UserPlus, Mail, KeyRound } from 'lucide-react';
+import { Loader2, UserPlus, Mail, KeyRound, UserCircle } from 'lucide-react';
 
 const signUpSchema = z.object({
-  email: z.string().email({ message: "Invalid email address" }),
+  username: z.string().min(3, { message: "Username must be at least 3 characters" }).max(20, {message: "Username must be 20 characters or less"}).regex(/^[a-zA-Z0-9_]+$/, { message: "Username can only contain letters, numbers, and underscores" }),
   password: z.string().min(6, { message: "Password must be at least 6 characters" }),
   confirmPassword: z.string(),
 }).refine(data => data.password === data.confirmPassword, {
@@ -24,6 +24,8 @@ const signUpSchema = z.object({
 });
 
 type SignUpFormValues = z.infer<typeof signUpSchema>;
+
+const DEFAULT_EMAIL_DOMAIN = "example.com";
 
 export function SignUpForm() {
   const [loading, setLoading] = useState(false);
@@ -35,14 +37,20 @@ export function SignUpForm() {
 
   const onSubmit: SubmitHandler<SignUpFormValues> = async (data) => {
     setLoading(true);
+    const email = `${data.username}@${DEFAULT_EMAIL_DOMAIN}`;
     try {
-      await createUserWithEmailAndPassword(auth, data.email, data.password);
-      toast({ title: "Account created successfully! Please sign in." });
+      const userCredential = await createUserWithEmailAndPassword(auth, email, data.password);
+      await updateProfile(userCredential.user, { displayName: data.username });
+      toast({ title: "Account created successfully!", description: `Your email is ${email}. Please sign in.` });
       // Redirect is handled by AuthLayout/HomePage after state change
     } catch (error: any) {
+      let errorMessage = error.message || "An unknown error occurred.";
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = `The username "${data.username}" (email: ${email}) is already taken. Please choose a different username.`;
+      }
       toast({
         title: "Sign-up failed",
-        description: error.message || "An unknown error occurred.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -71,13 +79,21 @@ export function SignUpForm() {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <div className="space-y-2">
-        <Label htmlFor="email">Email</Label>
+        <Label htmlFor="username">Username</Label>
         <div className="relative">
-          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-          <Input id="email" type="email" placeholder="your@email.com" {...register("email")} className="pl-10" />
+          <UserCircle className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+          <Input 
+            id="username" 
+            type="text" 
+            placeholder="Choose a username" 
+            {...register("username")} 
+            className="pl-10" 
+          />
         </div>
-        {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
+        {errors.username && <p className="text-sm text-destructive">{errors.username.message}</p>}
+        <p className="text-xs text-muted-foreground pl-1">Your email will be username@{DEFAULT_EMAIL_DOMAIN}</p>
       </div>
+      
       <div className="space-y-2">
         <Label htmlFor="password">Password</Label>
         <div className="relative">
@@ -86,6 +102,7 @@ export function SignUpForm() {
         </div>
         {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
       </div>
+
       <div className="space-y-2">
         <Label htmlFor="confirmPassword">Confirm Password</Label>
         <div className="relative">
@@ -94,8 +111,9 @@ export function SignUpForm() {
         </div>
         {errors.confirmPassword && <p className="text-sm text-destructive">{errors.confirmPassword.message}</p>}
       </div>
+
       <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" disabled={loading || googleLoading}>
-        {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}
+        {loading && !googleLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}
         Sign Up
       </Button>
        <div className="relative my-4">
@@ -129,3 +147,5 @@ export function SignUpForm() {
     </form>
   );
 }
+
+    
